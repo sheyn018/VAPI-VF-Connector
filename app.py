@@ -11,7 +11,7 @@ def hello_world():
 
 
 @app.route('/start', methods=['POST'])
-def api_call():
+def launch():
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
 
