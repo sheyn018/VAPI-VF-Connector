@@ -44,7 +44,7 @@ def launch():
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": "VF.DM.65e5c101ad8fa15835b3b768.rwEjVSlwR7vf8PXn"
+        "Authorization": "VF.DM.665a0547ee998f43239ef780.HvLoducHeGFxik5M"
     }
 
     response = requests.post(url, json=payload, headers=headers)
@@ -102,7 +102,7 @@ def api_call():
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "Authorization": "VF.DM.65e5c101ad8fa15835b3b768.rwEjVSlwR7vf8PXn"
+        "Authorization": "VF.DM.665a0547ee998f43239ef780.HvLoducHeGFxik5M"
     }
 
     response = requests.post(url, json=payload, headers=headers)
