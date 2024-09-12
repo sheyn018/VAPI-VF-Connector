@@ -16,7 +16,7 @@ VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/{user_id}/inte
 HEADERS = {
     "accept": "application/json",
     "content-type": "application/json",
-    "Authorization": f"Bearer {VOICEFLOW_API_KEY}"  # API Key correctly included as a Bearer token
+    "Authorization": "{VOICEFLOW_API_KEY}"  # API Key correctly included as a Bearer token
 }
 
 # Voiceflow request configuration
