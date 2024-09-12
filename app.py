@@ -1,23 +1,14 @@
-import os
 from flask import Flask, request, jsonify
-from dotenv import load_dotenv
 import requests
 
 app = Flask(__name__)
 
-# Load environment variables
-load_dotenv()
-
-# Constants
-VOICEFLOW_API_KEY = os.getenv("VOICEFLOW_API_KEY")
 VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
-
 HEADERS = {
     "accept": "application/json",
     "content-type": "application/json",
-    "Authorization": "{VOICEFLOW_API_KEY}"
+    "Authorization": "VF.DM.665a0547ee998f43239ef780.HvLoducHeGFxik5M"
 }
-
 CONFIG = {
     "tts": False,
     "stripSSML": True,
@@ -25,7 +16,6 @@ CONFIG = {
     "excludeTypes": ["block", "debug", "flow"]
 }
 
-# Helper function to extract nested data from a dictionary
 def get_nested_data(data, keys, default=None):
     for key in keys:
         try:
@@ -48,9 +38,8 @@ def interact_with_voiceflow(action_type, payload=None):
     response.raise_for_status()  # Will raise an error for bad status codes
     return response.json()
 
-# Process response data and extract text messages
 def process_response(response_data):
-    messages = set()
+    messages = set()  # Use a set to avoid duplicate messages
     for item in response_data:
         if item['type'] == 'text':
             messages.add(item['payload'].get('message', '').replace('\n', ' ').replace('**', ''))
@@ -59,64 +48,54 @@ def process_response(response_data):
                     text = child.get('text', '')
                     if text:
                         messages.add(text)
-    return list(messages)
+    return list(messages)  # Convert the set back to a list
 
-# Root endpoint with basic instructions
 @app.route('/')
-def index():
-    return '/start for initiating booking process <br> /query for asking questions'
+def hello_world():
+    return 'Hello, World!'
 
-# Endpoint to initiate the booking process
 @app.route('/start', methods=['POST'])
 def launch():
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
-
-    # Extract necessary data from the request
     tool_call_id = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "id"])
     user_question = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "function", "arguments", "query"])
 
     if user_question is None:
         return jsonify({"error": "Question not found in request"}), 400
 
-    print('Starting Voiceflow interaction...')
-    print('Start question:', user_question)
+    print('STARTING VF...')
+    print('START QUESTION:', user_question)
 
-    # Make the API call to Voiceflow
     response_data = interact_with_voiceflow("launch")
     messages = process_response(response_data)
 
-    print('Voiceflow response:', messages)
+    print('START VF RESPONSE:', messages)
 
     return jsonify({"results": [{"toolCallId": tool_call_id, "result": messages}]})
 
-# Endpoint for handling user queries
 @app.route('/query', methods=['POST'])
 def api_call():
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
-
-    # Extract necessary data from the request
     tool_call_id = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "id"])
     user_question = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "function", "arguments", "query"])
 
     if user_question is None:
         return jsonify({"error": "Question not found in request"}), 400
 
-    print('Query to Voiceflow:', user_question)
+    print('QUERY TO VF: ', user_question)
 
-    # Make the API call to Voiceflow with the user query
     response_data = interact_with_voiceflow("text", user_question)
     messages = process_response(response_data)
 
-    print('Voiceflow response:', messages)
+    print('QUERY VF RESPONSE:', messages)
 
     return jsonify({"results": [{"toolCallId": tool_call_id, "result": messages}]})
 
-# Run the app in threaded mode to handle multiple requests concurrently
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, threaded=True)
