@@ -1,14 +1,63 @@
+import os
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv
 import requests
-import json
 
 app = Flask(__name__)
+load_dotenv()
 
+VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
+VOICEFLOW_API_KEY = os.getenv("VOICEFLOW_API_KEY")
+
+HEADERS = {
+    "accept": "application/json",
+    "content-type": "application/json",
+    "Authorization": "{VOICEFLOW_API_KEY}"
+}
+CONFIG = {
+    "tts": False,
+    "stripSSML": True,
+    "stopAll": True,
+    "excludeTypes": ["block", "debug", "flow"]
+}
+
+def get_nested_data(data, keys, default=None):
+    for key in keys:
+        try:
+            if isinstance(data, list):
+                data = data[key] if key < len(data) else default
+            else:
+                data = data.get(key, default)
+        except (AttributeError, IndexError, TypeError):
+            return default
+        if data is default:
+            break
+    return data
+
+def interact_with_voiceflow(action_type, payload=None):
+    payload = {
+        "action": {"type": action_type, "payload": payload},
+        "config": CONFIG
+    }
+    response = requests.post(VOICEFLOW_URL, json=payload, headers=HEADERS)
+    response.raise_for_status() 
+    return response.json()
+
+def process_response(response_data):
+    messages = set()
+    for item in response_data:
+        if item['type'] == 'text':
+            messages.add(item['payload'].get('message', '').replace('\n', ' ').replace('**', ''))
+            for content_item in item['payload'].get('slate', {}).get('content', []):
+                for child in content_item.get('children', []):
+                    text = child.get('text', '')
+                    if text:
+                        messages.add(text)
+    return list(messages)
 
 @app.route('/')
-def hello_world():
-    return 'Hello, World!'
-
+def index():
+    return '/start for initiating booking process <br> /query for asking questions'
 
 @app.route('/start', methods=['POST'])
 def launch():
@@ -16,57 +65,21 @@ def launch():
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
-
-    # Navigate through the nested structure to get the question
-    user_question = data.get("message", {}).get("functionCall",
-                                                {}).get("parameters",
-                                                        {}).get("name")
+    tool_call_id = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "id"])
+    user_question = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "function", "arguments", "query"])
 
     if user_question is None:
-        # Handle the case where "question" is not in the data dictionary
-        print("The question key is not present in the data dictionary.")
+        return jsonify({"error": "Question not found in request"}), 400
 
-    print(user_question)
+    print('STARTING VF...')
+    print('START QUESTION:', user_question)
 
-    url = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
+    response_data = interact_with_voiceflow("launch")
+    messages = process_response(response_data)
 
-    payload = {
-        "action": {
-            "type": "launch"
-        },
-        "config": {
-            "tts": False,
-            "stripSSML": True,
-            "stopAll": True,
-            "excludeTypes": ["block", "debug", "flow"]
-        }
-    }
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "Authorization": ""
-    }
+    print('START VF RESPONSE:', messages)
 
-    response = requests.post(url, json=payload, headers=headers)
-
-    response_data = response.json()
-
-    # Extracting messages from the response
-    messages = []
-    for item in response_data:
-        if item['type'] == 'text':
-            message = item['payload'].get('message')
-            if message:
-                messages.append(message)
-            content = item['payload'].get('slate', {}).get('content', [])
-            for content_item in content:
-                for child in content_item.get('children', []):
-                    text = child.get('text')
-                    if text:
-                        messages.append(text)
-
-    print(messages)
-    return jsonify({"result": messages})
+    return jsonify({"results": [{"toolCallId": tool_call_id, "result": messages}]})
 
 @app.route('/query', methods=['POST'])
 def api_call():
@@ -74,52 +87,20 @@ def api_call():
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
-
-    # Navigate through the nested structure to get the question
-    user_question = data.get("message", {}).get("functionCall", {}).get("parameters", {}).get("question")
+    tool_call_id = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "id"])
+    user_question = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "function", "arguments", "query"])
 
     if user_question is None:
-        # Handle the case where "question" is not in the data dictionary
-        print("The question key is not present in the data dictionary.")
         return jsonify({"error": "Question not found in request"}), 400
 
-    print('THIS IS SENT TO VF: ', user_question)
+    print('QUERY TO VF: ', user_question)
 
-    url = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
+    response_data = interact_with_voiceflow("text", user_question)
+    messages = process_response(response_data)
 
-    payload = {
-        "action": {
-            "type": "text",
-            "payload": user_question
-        },
-        "config": {
-            "tts": False,
-            "stripSSML": True,
-            "stopAll": True,
-            "excludeTypes": ["block", "debug", "flow"]
-        }
-    }
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "Authorization": ""
-    }
+    print('QUERY VF RESPONSE:', messages)
 
-    response = requests.post(url, json=payload, headers=headers)
-
-    response_json = json.loads(response.text)
-
-    messages = []
-    for item in response_json:
-        if item['type'] == 'text':
-            # Clean the message by removing '\n' and '**'
-            cleaned_message = item['payload']['message'].replace('\n', ' ').replace('**', '')
-            messages.append(cleaned_message)
-
-    print('VF RETURNS THIS:', messages)
-
-    return jsonify({"result": messages})
-
+    return jsonify({"results": [{"toolCallId": tool_call_id, "result": messages}]})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, threaded=True)
