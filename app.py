@@ -12,8 +12,9 @@ VOICEFLOW_API_KEY = os.getenv("VOICEFLOW_API_KEY")
 HEADERS = {
     "accept": "application/json",
     "content-type": "application/json",
-    "Authorization": "{VOICEFLOW_API_KEY}"
+    "Authorization": VOICEFLOW_API_KEY
 }
+
 CONFIG = {
     "tts": False,
     "stripSSML": True,
@@ -56,8 +57,8 @@ def process_response(response_data):
     return list(messages)  # Convert the set back to a list
 
 @app.route('/')
-def hello_world():
-    return 'Hello, World!'
+def index():
+    return f'/start for initiating booking process <br> /query for asking questions <br> API Key: {VOICEFLOW_API_KEY}'
 
 @app.route('/start', methods=['POST'])
 def launch():
