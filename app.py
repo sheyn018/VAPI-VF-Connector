@@ -1,13 +1,18 @@
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv
 import requests
+import os
 
 app = Flask(__name__)
+load_dotenv()
 
 VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
+VOICEFLOW_API_KEY = os.getenv("VOICEFLOW_API_KEY")
+
 HEADERS = {
     "accept": "application/json",
     "content-type": "application/json",
-    "Authorization": "VF.DM.665a0547ee998f43239ef780.HvLoducHeGFxik5M"
+    "Authorization": "{VOICEFLOW_API_KEY}"
 }
 CONFIG = {
     "tts": False,
