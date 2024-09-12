@@ -10,16 +10,14 @@ load_dotenv()
 
 # Constants
 VOICEFLOW_API_KEY = os.getenv("VOICEFLOW_API_KEY")
-VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/{user_id}/interact?logs=off"
+VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
 
-# API request headers
 HEADERS = {
     "accept": "application/json",
     "content-type": "application/json",
-    "Authorization": "{VOICEFLOW_API_KEY}"  # API Key correctly included as a Bearer token
+    "Authorization": "{VOICEFLOW_API_KEY}"
 }
 
-# Voiceflow request configuration
 CONFIG = {
     "tts": False,
     "stripSSML": True,
@@ -41,23 +39,13 @@ def get_nested_data(data, keys, default=None):
             break
     return data
 
-# Interact with the Voiceflow API
-def interact_with_voiceflow(action_type, payload=None, user_id='default_user'):
-    # Construct the request URL
-    url = VOICEFLOW_URL.format(user_id=user_id)
-    
-    payload_data = {
+def interact_with_voiceflow(action_type, payload=None):
+    payload = {
         "action": {"type": action_type, "payload": payload},
         "config": CONFIG
     }
-
-    response = requests.post(url, json=payload_data, headers=HEADERS)
-
-    # Log errors if status code is >= 400
-    if response.status_code >= 400:
-        print(f"Error from Voiceflow API: {response.status_code} - {response.text}")
-
-    response.raise_for_status()  # Raises an error for bad status codes
+    response = requests.post(VOICEFLOW_URL, json=payload, headers=HEADERS)
+    response.raise_for_status()  # Will raise an error for bad status codes
     return response.json()
 
 # Process response data and extract text messages
