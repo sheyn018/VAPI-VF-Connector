@@ -1,3 +1,4 @@
+from typing import Dict, List, Optional
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 import logging
@@ -26,7 +27,7 @@ CONFIG = {
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-def get_nested_data(data: Any, keys: List[Any], default: Optional[Any] = None) -> Any:
+def get_nested_data(data: any, keys: List[any], default: Optional[any] = None) -> any:
     for key in keys:
         try:
             data = data[key]
@@ -34,7 +35,7 @@ def get_nested_data(data: Any, keys: List[Any], default: Optional[Any] = None) -
             return default
     return data
 
-def interact_with_voiceflow(action_type: str, payload: Optional[Any] = None) -> Dict:
+def interact_with_voiceflow(action_type: str, payload: Optional[any] = None) -> Dict:
     request_payload = {
         "action": {"type": action_type, "payload": payload},
         "config": CONFIG
