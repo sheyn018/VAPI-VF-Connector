@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import logging
 import requests
 import os
+import functools
 
 app = Flask(__name__)
 load_dotenv()
@@ -27,6 +28,8 @@ CONFIG = {
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
+# Use lru_cache to memoize the function
+@functools.lru_cache(maxsize=None)
 def get_nested_data(data: any, keys: List[any], default: Optional[any] = None) -> any:
     for key in keys:
         try:
@@ -55,12 +58,8 @@ def process_response(response_data: List[Dict]) -> List[str]:
             message = payload.get('message', '').replace('\n', ' ').replace('**', '')
             if message:
                 messages.add(message)
-            slate_content = payload.get('slate', {}).get('content', [])
-            for content_item in slate_content:
-                for child in content_item.get('children', []):
-                    text = child.get('text', '')
-                    if text:
-                        messages.add(text)
+            for content_item in payload.get('slate', {}).get('content', []):
+                messages.update(child.get('text', '') for child in content_item.get('children', []) if child.get('text'))
     return list(messages)
 
 def handle_voiceflow_interaction(action_type: str, requires_question: bool = True):
@@ -74,12 +73,8 @@ def handle_voiceflow_interaction(action_type: str, requires_question: bool = Tru
     if requires_question and user_question is None:
         return jsonify({"error": "Question not found in request"}), 400
 
-    if requires_question:
-        logging.info('%s TO VF: %s', action_type.upper(), user_question)
-        response_data = interact_with_voiceflow(action_type, user_question)
-    else:
-        logging.info('%s TO VF', action_type.upper())
-        response_data = interact_with_voiceflow(action_type)
+    logging.info('%s TO VF: %s', action_type.upper(), user_question if requires_question else '')
+    response_data = interact_with_voiceflow(action_type, user_question if requires_question else None)
 
     messages = process_response(response_data)
     logging.info('%s VF RESPONSE: %s', action_type.upper(), messages)
@@ -103,4 +98,4 @@ def handle_exception(e):
     return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, threaded=True)
+    app.run(host='0.0.0.0', port=8080)
