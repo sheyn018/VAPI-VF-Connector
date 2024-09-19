@@ -9,7 +9,7 @@ import functools
 app = Flask(__name__)
 load_dotenv()
 
-VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=off"
+VOICEFLOW_URL = "https://general-runtime.voiceflow.com/state/user/userID/interact?logs=on" # Need to change the userID to a dynamic one
 VOICEFLOW_API_KEY = os.getenv("VOICEFLOW_API_KEY")
 
 HEADERS = {
@@ -30,6 +30,8 @@ logging.basicConfig(level=logging.INFO)
 
 # Use lru_cache to memoize the function
 @functools.lru_cache(maxsize=None)
+
+# Extract the nested data from the incoming request
 def get_nested_data(data: any, keys: List[any], default: Optional[any] = None) -> any:
     for key in keys:
         try:
@@ -38,6 +40,7 @@ def get_nested_data(data: any, keys: List[any], default: Optional[any] = None) -
             return default
     return data
 
+# Interact with Voiceflow
 def interact_with_voiceflow(action_type: str, payload: Optional[any] = None) -> Dict:
     request_payload = {
         "action": {"type": action_type, "payload": payload},
@@ -50,6 +53,7 @@ def interact_with_voiceflow(action_type: str, payload: Optional[any] = None) -> 
     except ValueError:
         raise Exception("Invalid JSON response from Voiceflow")
 
+# Extract the messages from the Voiceflow response  
 def process_response(response_data: List[Dict]) -> List[str]:
     messages = set()
     for item in response_data:
@@ -66,6 +70,7 @@ def handle_voiceflow_interaction(action_type: str, requires_question: bool = Tru
     if not request.is_json:
         return jsonify({"error": "Request must be JSON"}), 400
 
+    # Extract the tool_call_id and user_question from the incoming request
     data = request.get_json()
     tool_call_id = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "id"])
     user_question = get_nested_data(data, ["message", "toolWithToolCallList", 0, "toolCall", "function", "arguments", "query"])
@@ -73,12 +78,17 @@ def handle_voiceflow_interaction(action_type: str, requires_question: bool = Tru
     if requires_question and user_question is None:
         return jsonify({"error": "Question not found in request"}), 400
 
+    # Log the interaction details
     logging.info('%s TO VF: %s', action_type.upper(), user_question if requires_question else '')
+
+    # Interact with Voiceflow
     response_data = interact_with_voiceflow(action_type, user_question if requires_question else None)
 
+    # Process the response from Voiceflow
     messages = process_response(response_data)
     logging.info('%s VF RESPONSE: %s', action_type.upper(), messages)
 
+    # Return the processed response
     return jsonify({"results": [{"toolCallId": tool_call_id, "result": messages}]})
 
 @app.route('/')
